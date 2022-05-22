@@ -361,3 +361,5 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/zBinkFix/MP x2 MT Release/zBinkFix.tlog
+/zBinkFix/MP x2 MT Release

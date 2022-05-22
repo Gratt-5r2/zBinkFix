@@ -4,6 +4,7 @@
 // Automatically generated block
 #pragma region Includes
 #include "zBinkFix/zBinkFix_Utils.cpp"
+#include "zBinkFix/zBinkImage/zBinkImage.cpp"
 #include "zBinkFix/zBinkFix.cpp"
 #include "Plugin.cpp"
 #pragma endregion

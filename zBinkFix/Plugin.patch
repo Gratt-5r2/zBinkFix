@@ -1,2 +1,7 @@
-// This patch will be automatically executed after loading the plugin.
-// TODO
+#engine [G1, G2A]
+	#patch [disable video player resolution limit]
+		INT JmpFrom = ZenDef(0x0043B7F0, 0, 0, 0x0043F466)
+		INT JmpTo   = ZenDef(0x0043B90D, 0, 0, 0x0043F622)
+		JMP(JmpFrom, JmpTo)
+	#/patch
+#/engine

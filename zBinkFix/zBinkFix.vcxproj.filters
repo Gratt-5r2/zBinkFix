@@ -217,6 +217,9 @@
     <Filter Include="Plugin\zBinkFix">
       <UniqueIdentifier>{a8f5fbf3-2233-4c9f-9fba-41c9ad70e009}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Plugin\zBinkFix\zBinkImage">
+      <UniqueIdentifier>{40e9d8f7-e2a9-4c80-9333-e05cec75186d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Interface.cpp">
@@ -2789,6 +2792,12 @@
     </ClInclude>
     <ClInclude Include="zBinkFix\zBinkFix_Utils.cpp">
       <Filter>Plugin\zBinkFix</Filter>
+    </ClInclude>
+    <ClInclude Include="zBinkFix\zBinkImage\zBinkImage.cpp">
+      <Filter>Plugin\zBinkFix\zBinkImage</Filter>
+    </ClInclude>
+    <ClInclude Include="zBinkFix\zBinkImage\zBinkImage.h">
+      <Filter>Plugin\zBinkFix\zBinkImage</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
