@@ -210,6 +210,13 @@ namespace GOTHIC_ENGINE {
   };
 
 
+  void CopyImage( zBinkImage& dst, const zBinkImage& src ) {
+    for( uint dy = 0; dy < dst.Size.Y; dy++ )
+      for( uint dx = 0; dx < dst.Size.X; dx++ )
+        dst( dx, dy ) = src( dx, dy );
+  }
+
+
   void ResizeImage( zBinkImage& dst, const zBinkImage& src ) {
     for( uint dy = 0; dy < dst.Size.Y; dy++ ) {
       int sy = src.Size.Y * dy / dst.Size.Y;
@@ -222,6 +229,11 @@ namespace GOTHIC_ENGINE {
 
 
   void InterpolateImage( zBinkImage& dst, const zBinkImage& src, const int& pixelSize ) {
+    if( dst.Size == src.Size ) {
+      CopyImage( dst, src );
+      return;
+    }
+
     if( pixelSize <= 0 || dst.Size < src.Size ) {
       ResizeImage( dst, src );
       return;

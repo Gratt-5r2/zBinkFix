@@ -101,8 +101,8 @@ namespace GOTHIC_ENGINE {
   RECT PlaceImageToScreen( const RECT& screenRect, const RECT& imageRect ) {
     float wScreen = screenRect.right  - screenRect.left;
     float hScreen = screenRect.bottom - screenRect.top;
-    float wImage  = imageRect.right  - imageRect.left;
-    float hImage  = imageRect.bottom - imageRect.top;
+    float wImage  = imageRect.right   - imageRect.left;
+    float hImage  = imageRect.bottom  - imageRect.top;
     float wRatio  = wScreen / wImage;
     float hRatio  = hScreen / hImage;
     float scale   = min( wRatio, hRatio );
