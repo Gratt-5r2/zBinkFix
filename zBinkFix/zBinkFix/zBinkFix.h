@@ -10,16 +10,16 @@ namespace GOTHIC_ENGINE {
 	struct zImageSize {
 		int X;
 		int Y;
-		int Pitch32;
+		int Pitch4;
 
-		zImageSize() : X(0), Y(0), Pitch32(0) {
+		zImageSize() : X(0), Y(0), Pitch4(0) {
 
 		}
 
 		zImageSize( const int& x, const int& y, const int& pitch ) {
 			X = x;
 			Y = y;
-			Pitch32 = pitch;
+			Pitch4 = pitch;
 		}
 
 		bool operator == ( const zImageSize& other ) const {
@@ -34,6 +34,33 @@ namespace GOTHIC_ENGINE {
 			return X > other.X && Y > other.Y;
 		}
 	};
+
+
+	class Chronograph {
+		double Frequency;
+		int64 StartTime;
+	public:
+
+		Chronograph() {
+			Frequency = 0.0;
+			StartTime = 0;
+		}
+
+		void StartCounter() {
+			LARGE_INTEGER li;
+			QueryPerformanceFrequency( &li );
+			Frequency = double( li.QuadPart ) / 1000.0;
+			QueryPerformanceCounter( &li );
+			StartTime = li.QuadPart;
+		}
+
+		int64 GetCounter() {
+			LARGE_INTEGER li;
+			QueryPerformanceCounter( &li );
+			return int64( double( li.QuadPart - StartTime ) / Frequency );
+		}
+	};
+
 
 	typedef long( __stdcall* BinkDoFrameFunc )(void* bink);
 	typedef long( __stdcall* BinkCopyToBufferFunc )(void* bink, void* dest, long destpitch, ulong destheight, ulong destx, ulong desty, ulong flags);

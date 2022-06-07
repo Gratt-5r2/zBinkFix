@@ -13,7 +13,7 @@ namespace GOTHIC_ENGINE {
   BinkBufferBlitFunc BinkBufferBlit     = (BinkBufferBlitFunc)BinkImport( "_BinkBufferBlit@12" );
 
 
-  void sysEvent() {
+  static void sysEvent() {
 #if ENGINE == Engine_G1
     XCALL( 0x004F6AC0 );
 #elif ENGINE == Engine_G1A
@@ -26,52 +26,58 @@ namespace GOTHIC_ENGINE {
   }
 
 
-  int max2( const int& x, const int& y ) {
+  inline SIZE ToSize( const int& x, const int& y ) {
+    SIZE sz;
+    sz.cx = x;
+    sz.cy = y;
+    return sz;
+  }
+
+
+  inline void GetScreenSize( int& x, int& y ) {
+    x = zrenderer->vid_xdim;
+    y = zrenderer->vid_ydim;
+  }
+
+
+  inline int min2( const int& x, const int& y ) {
+    return min( x, y );
+  }
+
+
+  inline int min3( const int& x, const int& y, const int& z ) {
+    return min2( min2( x, y ), z );
+  }
+
+
+  inline int max2( const int& x, const int& y ) {
     return max( x, y );
   }
 
 
-  int max3( const int& x, const int& y, const int& z ) {
+  inline int max3( const int& x, const int& y, const int& z ) {
     return max2( max2( x, y ), z );
   }
 
 
-  bool ReadOption( const string& section, const string& value ) {
+  bool ReadOption( const string& section, const string& value, const bool& default = true ) {
     bool result = true;
-    Union.GetSysPackOption().Read( result, section, value, result );
+    Union.GetSysPackOption().Read( result, section, value, default );
     return result;
   }
 
 
-  char* ResizeTexture( int* srcsize, int dstx, int dsty, void* src, void* dest, unsigned long fmt ) {
-#if ENGINE == Engine_G1
-    XCALL( 0x00720B50 );
-#elif ENGINE == Engine_G1A
-    XCALL( 0x0075D4E0 );
-#elif ENGINE == Engine_G2
-    XCALL( 0x0076CB40 );
-#elif ENGINE == Engine_G2A
-    XCALL( 0x00659670 );
-#endif
+  inline float SafeDivide( const float& a, const float& b ) {
+    return b == 0.0f ? 0.0f : a / b;
   }
 
 
-  inline double __SafeDiv( const double& a, const double& b ) {
-    return SafeDiv( a, b );
-  }
-
-
-  inline int __SafeDiv( const int& a, const int& b ) {
-    return SafeDiv( a, b );
-  }
-
-
-  inline uint lindex( const uint& x, const uint& y, const uint& width ) {
+  inline int xy2i( const int& x, const int& y, const int& width ) {
     return y * width + x;
   }
 
 
-  RECT FitRect( const RECT& screenRect, const RECT& imageRect ) {
+  static RECT FitRect( const RECT& screenRect, const RECT& imageRect ) {
     RECT newRect = imageRect;
     if( newRect.left   < 0 )                 newRect.left = 0;
     if( newRect.top    < 0 )                 newRect.top  = 0;
@@ -81,7 +87,7 @@ namespace GOTHIC_ENGINE {
   }
 
 
-  RECT AlignToCenter( const RECT& screenRect, const RECT& imageRect ) {
+  static RECT AlignToCenter( const RECT& screenRect, const RECT& imageRect ) {
     int wScreen = screenRect.right  - screenRect.left;
     int hScreen = screenRect.bottom - screenRect.top;
     int wImage  = imageRect.right   - imageRect.left;
@@ -97,8 +103,9 @@ namespace GOTHIC_ENGINE {
     return newRect;
   }
 
-
-  RECT PlaceImageToScreen( const RECT& screenRect, const RECT& imageRect ) {
+#pragma warning(push)
+#pragma warning(disable:4244)
+  static RECT PlaceImageToScreen( const RECT& screenRect, const RECT& imageRect ) {
     float wScreen = screenRect.right  - screenRect.left;
     float hScreen = screenRect.bottom - screenRect.top;
     float wImage  = imageRect.right   - imageRect.left;
@@ -113,5 +120,62 @@ namespace GOTHIC_ENGINE {
     newRect.right  = wImage * scale;
     newRect.bottom = hImage * scale;
     return FitRect( screenRect, AlignToCenter( screenRect, newRect ) );
+  }
+#pragma warning(pop)
+
+
+  static int GetCpusCount() {
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo( &sysinfo );
+    return sysinfo.dwNumberOfProcessors;
+  }
+
+
+  static int BinkGetInterpolationThreadsCount() {
+    int cpus = GetCpusCount();
+    int threadsCount;
+    if( cpus <= 2 ) threadsCount = cpus;     // Shitbox
+    else            threadsCount = cpus / 2; // Stanrard PC
+
+    Union.GetSysPackOption().Read( threadsCount, "DEBUG", "FixBink_InterpCpuCount", threadsCount );
+    return min( threadsCount, INTERPOLATION_INFO_DIM );
+  }
+
+
+  static int BinkGetInterpolationPixelSize() {
+    int cpus = GetCpusCount();
+    int pixelSize;
+         if( cpus == 1  ) pixelSize = 0; // Shitbox
+    else if( cpus >= 16 ) pixelSize = 1; // Who are you ??
+    else                  pixelSize = 2; // Stanrard PC
+
+    Union.GetSysPackOption().Read( pixelSize, "DEBUG", "FixBink_InterpPixelSize", pixelSize );
+    return pixelSize;
+  }
+
+
+  static int BinkGetDecreaseQuelityWithLags() {
+    bool enabled = true;
+    Union.GetSysPackOption().Read( enabled, "DEBUG", "FixBink_ReduceQualityWithLags", enabled );
+    return enabled;
+  }
+
+
+  static bool CkeckFixBinkEnabled() {
+    if( !CHECK_THIS_ENGINE )
+      return false;
+
+    if( Union.Dx11IsEnabled() )
+      return false;
+
+    if( ReadOption( "DEBUG", "FixBink", true ) != 1 )
+      return false;
+
+    if( ReadOption( "DEBUG", "FixBinkOld", false ) == 1 ) {
+      LoadLibraryAST( "zFixBinkOld.dll" );
+      return false;
+    }
+
+    return true;
   }
 }

@@ -8,6 +8,7 @@ int zCBinkPlayer::PlayFrame_Union();
 void zCBinkPlayer::EndFrame();
 void DrawFrameOnView( zCView* view );
 void GetBinkSize( int& x, int& y );
+ulong GetBinkFrameRate();
 void CorrectViewAspectRatio( zCView* view );
 int BlitFrame();
 int OpenSurface( zTRndSurfaceDesc& srf );

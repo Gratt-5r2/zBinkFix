@@ -3,5 +3,7 @@
 		INT JmpFrom = ZenDef(0x0043B7F0, 0, 0, 0x0043F466)
 		INT JmpTo   = ZenDef(0x0043B90D, 0, 0, 0x0043F622)
 		JMP(JmpFrom, JmpTo)
+		HEX @(ZenDef(0x0043B9FB, 0, 0, 0x0043F714)) = '90 90 90 90 90 90'
+        HEX @(ZenDef(0x0043BA04, 0, 0, 0x0043F71D)) = '90 90 90 90 90 90'
 	#/patch
 #/engine

@@ -5,6 +5,7 @@
 #pragma comment (lib,"Gdiplus.lib")
 using namespace Gdiplus;
 #include "xmmintrin.h"	
+//#include <x86intrin.h>
 
 
 // Static RTTI DynamicCast pointer
