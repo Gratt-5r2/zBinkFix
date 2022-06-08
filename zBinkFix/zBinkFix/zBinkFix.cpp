@@ -38,6 +38,16 @@ namespace GOTHIC_ENGINE {
   }
 
 
+  RECT MakeRect( const int& width, const int& height ) {
+    RECT rect;
+    rect.left = 0;
+    rect.top = 0;
+    rect.right = width;
+    rect.bottom = height;
+    return rect;
+  }
+
+
   void zCBinkPlayer::GetBinkSize( int& x, int& y ) {
     ulong* xy = (ulong*)mVideoHandle;
     x = xy[0];
@@ -56,7 +66,23 @@ namespace GOTHIC_ENGINE {
   }
 
 
+  ulong zCBinkPlayer::GetBinkFrame() {
+    return ((ulong*)mVideoHandle)[3];
+  }
+
+
+  void zCBinkPlayer::SetBinkFrame( const ulong& frame ) {
+    ((ulong*)mVideoHandle)[3] = frame;
+  }
+
+
+  ulong zCBinkPlayer::GetBinkFramesCount() {
+    return ((ulong*)mVideoHandle)[2];
+  }
+
+
   int zCBinkPlayer::BeginFrame() {
+    sysEvent();
     if( !IsPlaying() )
       return False;
 
@@ -103,18 +129,8 @@ namespace GOTHIC_ENGINE {
   }
 
 
-  RECT MakeRect( const int& width, const int& height ) {
-    RECT rect;
-    rect.left = 0;
-    rect.top = 0;
-    rect.right = width;
-    rect.bottom = height;
-    return rect;
-  }
-
-
-  int zCBinkPlayer::BlitFrame() {
-    if( NextFrameTime != Invalid ) {
+  int zCBinkPlayer::BlitFrame( const bool& idle ) {
+    if( !idle && NextFrameTime != Invalid ) {
       if( Timer::GetTime() < NextFrameTime )
         return True;
       
@@ -138,7 +154,13 @@ namespace GOTHIC_ENGINE {
 
     surfaceSize.Pitch4 = ddsd.lPitch / sizeof( int );
     videoSize.Pitch4 = videoSize.X;
-    UpdateBinkBufferSize( BinkImageBuffer, videoSize.X, videoSize.Y );
+
+    if( idle ) {
+      BinkInterpolationTable.Update( surfaceSize, videoSize );
+      UpdateBinkBufferSize( BinkImageBuffer, videoSize.X, videoSize.Y );
+      CloseSurface( surfaceRect );
+      return True;
+    }
 
     BinkCopyToBuffer( mVideoHandle, BinkImageBuffer, videoSize.Pitch4 * sizeof( int ), videoSize.Y, 0, 0, BINKCPY_FLAGS);
 
@@ -152,16 +174,28 @@ namespace GOTHIC_ENGINE {
 
   HOOK Hook_zCBinkPlayer_OpenVideo PATCH_IF( &zCBinkPlayer::OpenVideo, &zCBinkPlayer::OpenVideo_Union, IsFixBinkEnabled );
 
+#pragma warning(push)
+#pragma warning(disable:4244)
   int zCBinkPlayer::OpenVideo_Union( zSTRING name ) {
     TimeAccumulator( Invalid );
     InterpolationPixelSizeCurrent = InterpolationPixelSize;
-    return THISCALL( Hook_zCBinkPlayer_OpenVideo )( name );
+    int ok = THISCALL( Hook_zCBinkPlayer_OpenVideo )( name );
+    if( ok ) {
+      zCRnd_D3D* rnd = (zCRnd_D3D*)zrenderer;
+      rnd->Vid_Clear( (zCOLOR)GFX_BLACK, 3 );
+      rnd->Vid_Blit( True, Null, Null );
+      BlitFrame( true );
+      if( dynamic_cast<zCSndSys_MSS*>(zsound) )
+        BinkSetVolume( mVideoHandle, 0, mSoundOn ? 65536 * mSoundVolume : 0 );
+    }
+
+    return ok;
   }
+#pragma warning(pop)
 
 
 
   HOOK Hook_zCBinkPlayer_PlayFrame PATCH_IF( &zCBinkPlayer::PlayFrame, &zCBinkPlayer::PlayFrame_Union, IsFixBinkEnabled );
-
 
   int zCBinkPlayer::PlayFrame_Union() {
     static Chronograph chrono;
@@ -201,6 +235,102 @@ namespace GOTHIC_ENGINE {
     PlayWaitNextFrame();
     PlayGotoNextFrame();
     zrenderer->Vid_Blit( True, Null, Null );
-    sysEvent();
   }
+
+
+
+  HOOK Hook_zCBinkPlayer_PlayHandleEvents PATCH_IF( &oCBinkPlayer::PlayHandleEvents, &oCBinkPlayer::PlayHandleEvents_Union, IsFixBinkEnabled );
+
+#pragma warning(push)
+#pragma warning(disable:4244)
+  int oCBinkPlayer::PlayHandleEvents_Union() {
+    if( disallowInputHandling || !mVideoHandle || zCBinkPlayer::PlayHandleEvents() )
+      return FALSE;
+
+    uint16 key = zinput->GetKey( False, False );
+    zinput->ProcessInputEvents();
+
+    if( !extendedKeys ) {
+      switch( key ) {
+        case KEY_SPACE:
+        case KEY_ESCAPE:
+          Stop();
+          return True;
+      }
+
+      return False;
+    }
+
+    switch( key ) {
+      case KEY_HOME:
+      {
+        BinkGoto( mVideoHandle, 1, 0 );
+        return True;
+      }
+
+      case KEY_RIGHT:
+      {
+        ulong nextFrame = GetBinkFrame() + 30;
+        ulong framesNum = GetBinkFramesCount();
+        if( nextFrame >= framesNum )
+          nextFrame = framesNum - 1;
+
+        BinkGoto( mVideoHandle, nextFrame, 1 );
+        return True;
+      }
+
+      case KEY_LEFT:
+      {
+        ulong nextFrame = GetBinkFrame() - min( GetBinkFrame(), 30 );
+        BinkGoto( mVideoHandle, nextFrame, 1 );
+        return True;
+      }
+
+      case KEY_SPACE:
+      {
+        mPaused ? Unpause() : Pause();
+        return True;
+      }
+
+      case KEY_ESCAPE:
+      {
+        Stop();
+        return True;
+      }
+
+      case KEY_DOWN:
+      {
+        mSoundVolume -= 0.1f;
+        if( mSoundVolume < 0.0f )
+          mSoundVolume = 0.0f;
+
+        BinkSetVolume( mVideoHandle, 0, 65536 * mSoundVolume );
+        return True;
+      }
+
+      case KEY_UP:
+      {
+        mSoundVolume += 0.1f;
+        if( mSoundVolume > 1.0f )
+          mSoundVolume = 1.0f;
+
+        BinkSetVolume( mVideoHandle, 0, 65536 * mSoundVolume );
+        return True;
+      }
+
+      case KEY_Q:
+      {
+        if( mSoundOn ) {
+          BinkSetVolume( mVideoHandle, 0, 0 );
+          mSoundOn = False;
+        }
+        else {
+          BinkSetVolume( mVideoHandle, 0, 65536 * mSoundVolume );
+          mSoundOn = True;
+        }
+        return True;
+      }
+    }
+  }
+#pragma warning(pop)
 }

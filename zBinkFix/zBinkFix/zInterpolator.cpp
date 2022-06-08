@@ -68,7 +68,7 @@ namespace GOTHIC_ENGINE {
   };
 
 
-	void CopyImage( zBinkImage& dst, const zBinkImage& src ) {
+  void CopyImage( zBinkImage& dst, const zBinkImage& src ) {
     for( int dy = 0; dy < dst.Size.Y; dy++ ) {
       int dlny = dy * dst.Size.Pitch4;
       int slny = dy * src.Size.Pitch4;
@@ -103,7 +103,6 @@ namespace GOTHIC_ENGINE {
       return;
     }
 
-    BinkInterpolationTable.Update( dst.Size, src.Size );
     static zInterpolator* interpolation = new zInterpolator[INTERPOLATION_INFO_DIM];
     int yStep = dst.Size.Y / INTERPOLATION_INFO_DIM;
     int yStart = 0;

@@ -22,7 +22,7 @@ namespace GOTHIC_ENGINE {
   }
 
 
-	zBinkInterpolationTable::zBinkInterpolationTable() {
+  zBinkInterpolationTable::zBinkInterpolationTable() {
     Table = Null;
     LinesIndexes = Null;
   }
@@ -70,10 +70,10 @@ namespace GOTHIC_ENGINE {
         point.PixelIndex[2] = xy2i( xIdLow , yIdHigh, smallSize.X );
         point.PixelIndex[3] = xy2i( xIdHigh, yIdHigh, smallSize.X );
 
-        point.Divisor[0] = 255.0f * point.PixelWeight[0];
-        point.Divisor[1] = 255.0f * point.PixelWeight[1];
-        point.Divisor[2] = 255.0f * point.PixelWeight[2];
-        point.Divisor[3] = 255.0f * point.PixelWeight[3];
+        point.Divisor[0] = ceil( 253.9f * point.PixelWeight[0] );
+        point.Divisor[1] = ceil( 253.9f * point.PixelWeight[1] );
+        point.Divisor[2] = ceil( 253.9f * point.PixelWeight[2] );
+        point.Divisor[3] = ceil( 253.9f * point.PixelWeight[3] );
       }
     }
   }

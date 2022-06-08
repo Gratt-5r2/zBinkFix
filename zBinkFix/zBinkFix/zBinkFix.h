@@ -65,10 +65,13 @@ namespace GOTHIC_ENGINE {
 	typedef long( __stdcall* BinkDoFrameFunc )(void* bink);
 	typedef long( __stdcall* BinkCopyToBufferFunc )(void* bink, void* dest, long destpitch, ulong destheight, ulong destx, ulong desty, ulong flags);
 	typedef void( __stdcall* BinkBufferBlitFunc )(void* buf, void* rects, ulong numrects);
+	typedef void( __stdcall* BinkGotoFunc )(void* bink, ulong frame, long flags);
+	typedef void( __stdcall* BinkSetVolumeFunc )(void* bnk, uint trackid, long volume );
 
 	extern BinkDoFrameFunc BinkDoFrame;
 	extern BinkCopyToBufferFunc BinkCopyToBuffer;
 	extern BinkBufferBlitFunc BinkBufferBlit;
+	extern BinkGotoFunc BinkGoto;
 
 	extern void sysEvent();
 	extern int max2( const int& x, const int& y );

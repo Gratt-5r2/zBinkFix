@@ -11,6 +11,12 @@ namespace GOTHIC_ENGINE {
   BinkDoFrameFunc BinkDoFrame           = (BinkDoFrameFunc)BinkImport( "_BinkDoFrame@4" );
   BinkCopyToBufferFunc BinkCopyToBuffer = (BinkCopyToBufferFunc)BinkImport( "_BinkCopyToBuffer@28" );
   BinkBufferBlitFunc BinkBufferBlit     = (BinkBufferBlitFunc)BinkImport( "_BinkBufferBlit@12" );
+  BinkGotoFunc BinkGoto                 = (BinkGotoFunc)BinkImport( "_BinkGoto@12" );
+#if ENGINE >= Engine_G2
+  BinkSetVolumeFunc BinkSetVolume       = (BinkSetVolumeFunc)BinkImport( "_BinkSetVolume@12" );
+#else
+  BinkSetVolumeFunc BinkSetVolume       = (BinkSetVolumeFunc)BinkImport( "_BinkSetVolume@8" );
+#endif
 
 
   static void sysEvent() {
@@ -121,7 +127,6 @@ namespace GOTHIC_ENGINE {
     newRect.bottom = hImage * scale;
     return FitRect( screenRect, AlignToCenter( screenRect, newRect ) );
   }
-#pragma warning(pop)
 
 
   static int GetCpusCount() {
@@ -133,13 +138,12 @@ namespace GOTHIC_ENGINE {
 
   static int BinkGetInterpolationThreadsCount() {
     int cpus = GetCpusCount();
-    int threadsCount;
-    if( cpus <= 2 ) threadsCount = cpus;     // Shitbox
-    else            threadsCount = cpus / 2; // Stanrard PC
+    int threadsCount = cpus <= 6 ? cpus : cpus * 0.80;
 
     Union.GetSysPackOption().Read( threadsCount, "DEBUG", "FixBink_InterpCpuCount", threadsCount );
     return min( threadsCount, INTERPOLATION_INFO_DIM );
   }
+#pragma warning(pop)
 
 
   static int BinkGetInterpolationPixelSize() {
