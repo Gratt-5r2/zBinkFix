@@ -5,7 +5,9 @@
 
 int zCBinkPlayer::BeginFrame();
 int zCBinkPlayer::PlayFrame_Union();
-void zCBinkPlayer::EndFrame();
+int zCBinkPlayer::PlayFrameBigScreen();
+void zCBinkPlayer::EndFrame( const bool& blit = true );
+int zCBinkPlayer::CloseVideo_Union();
 void DrawFrameOnView( zCView* view );
 void GetBinkSize( int& x, int& y );
 ulong GetBinkFrameRate();
@@ -14,8 +16,11 @@ void SetBinkFrame( const ulong& frame );
 ulong GetBinkFramesCount();
 void CorrectViewAspectRatio( zCView* view );
 int BlitFrame( const bool& idle = false );
-int OpenSurface( zTRndSurfaceDesc& srf );
 int OpenSurface( RECT& rect, DDSURFACEDESC2& ddsd );
 int CloseSurface();
 int CloseSurface( RECT& rect );
 int OpenVideo_Union( zSTRING );
+ulong GetBinkFrameTime();
+void ClearScreen();
+RECT* GetBinkRects();
+bool GetChangedRegion( RECT& region );

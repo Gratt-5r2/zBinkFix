@@ -48,7 +48,8 @@ namespace GOTHIC_ENGINE {
     };
 
     zInterpolationPoint* Table;
-    uint* LinesIndexes;
+    uint* LinesImageIndexes;
+    uint* LinesTableIndexes;
     zImageSize BigSize;
     zImageSize SmallSize;
 
@@ -56,8 +57,9 @@ namespace GOTHIC_ENGINE {
     void Update( const zImageSize& bigSize, const zImageSize& smallSize );
     int GetInterpolatedColor( const zBinkImage& smallImage, const int& xBig, const int& yBig );
     int GetLinearColor( const zBinkImage& smallImage, const int& xBig, const int& yBig );
-    int GetLineStart( const int& y ) { return LinesIndexes[y]; }
-    int GetLinearIndex( const int& x, const int& y ) { return LinesIndexes[y] + x; }
+    int GetLineStart( const int& y ) { return LinesImageIndexes[y]; }
+    int GetLinearIndex( const int& x, const int& y ) { return LinesImageIndexes[y] + x; }
+    void Clear();
     ~zBinkInterpolationTable();
   };
 

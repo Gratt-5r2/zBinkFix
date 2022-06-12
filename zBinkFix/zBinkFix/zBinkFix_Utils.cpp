@@ -12,6 +12,7 @@ namespace GOTHIC_ENGINE {
   BinkCopyToBufferFunc BinkCopyToBuffer = (BinkCopyToBufferFunc)BinkImport( "_BinkCopyToBuffer@28" );
   BinkBufferBlitFunc BinkBufferBlit     = (BinkBufferBlitFunc)BinkImport( "_BinkBufferBlit@12" );
   BinkGotoFunc BinkGoto                 = (BinkGotoFunc)BinkImport( "_BinkGoto@12" );
+  BinkGetRectsFunc BinkGetRects         = (BinkGetRectsFunc)BinkImport( "_BinkGetRects@8" );
 #if ENGINE >= Engine_G2
   BinkSetVolumeFunc BinkSetVolume       = (BinkSetVolumeFunc)BinkImport( "_BinkSetVolume@12" );
 #else
@@ -43,6 +44,13 @@ namespace GOTHIC_ENGINE {
   inline void GetScreenSize( int& x, int& y ) {
     x = zrenderer->vid_xdim;
     y = zrenderer->vid_ydim;
+  }
+
+
+  inline void GetScreenSize( int& x, int& y, int& pitch4 ) {
+    x = zrenderer->vid_xdim;
+    y = zrenderer->vid_ydim;
+    pitch4 = x;
   }
 
 
@@ -149,12 +157,23 @@ namespace GOTHIC_ENGINE {
   static int BinkGetInterpolationPixelSize() {
     int cpus = GetCpusCount();
     int pixelSize;
-         if( cpus == 1  ) pixelSize = 0; // Shitbox
-    else if( cpus >= 16 ) pixelSize = 1; // Who are you ??
-    else                  pixelSize = 2; // Stanrard PC
+         if( cpus == 1 ) pixelSize = 0; // Shitbox
+    else if( cpus <  4 ) pixelSize = 2; // Who are you ??
+    else                 pixelSize = 1; // Stanrard PC
 
     Union.GetSysPackOption().Read( pixelSize, "DEBUG", "FixBink_InterpPixelSize", pixelSize );
     return pixelSize;
+  }
+
+
+  static int BinkGetInterpolationPixelSizeMin() {
+    int cpus = GetCpusCount();
+    int pixelSize = BinkGetInterpolationPixelSize();
+    if( pixelSize == 0 )
+      return 3;
+
+    int pixelSizeMin = cpus <= 2 ? 2 : 1;
+    return min( pixelSize, pixelSizeMin );
   }
 
 
@@ -181,5 +200,54 @@ namespace GOTHIC_ENGINE {
     }
 
     return true;
+  }
+
+
+  static void BinkFixReport( const string& msg ) {
+    static Col16 c0;
+    static Col16 c1( CMD_CYAN );
+    static Col16 c2( CMD_CYAN | CMD_INT );
+    cmd << c1 << "BNK: " << c2 << msg << c0 << endl;
+  }
+
+  static
+    RECT BinkRectToRect( const BINKRECT& binkRect ) {
+    RECT rect;
+    rect.left = binkRect.left;
+    rect.top = binkRect.top;
+    rect.right = binkRect.left + binkRect.right;
+    rect.bottom = binkRect.top + binkRect.bottom;
+    return rect;
+  }
+
+
+  static BINKRECT RectToBinkRect( const RECT& rect ) {
+    BINKRECT binkRect;
+    binkRect.left = rect.left;
+    binkRect.top = rect.top;
+    binkRect.right = rect.right - rect.left;
+    binkRect.bottom = rect.bottom - rect.top;
+    return binkRect;
+  }
+
+
+  bool IsResMoreThan4K() {
+    int x, y;
+    GetScreenSize( x, y );
+    return x > 3840 || y > 2160;
+  }
+
+
+  bool IsResMoreThan5K() {
+    int x, y;
+    GetScreenSize( x, y );
+    return x > 4703 || y > 2645;
+  }
+
+
+  bool IsResMoreThan6K() {
+    int x, y;
+    GetScreenSize( x, y );
+    return x > 5431 || y > 3055;
   }
 }

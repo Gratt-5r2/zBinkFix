@@ -3,3 +3,4 @@
 // User API for zCRnd_D3D
 // Add your methods here
 
+int Vid_Lock( RECT& rect, zTRndSurfaceDesc& surfdesc );

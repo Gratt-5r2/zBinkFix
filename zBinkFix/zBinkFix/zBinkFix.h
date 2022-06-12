@@ -33,6 +33,19 @@ namespace GOTHIC_ENGINE {
 		bool operator > ( const zImageSize& other ) const {
 			return X > other.X && Y > other.Y;
 		}
+
+    int GetScaleFactor( const zImageSize& other ) {
+      if( *this < other )
+        return 0;
+
+      if( *this == other )
+        return 1;
+
+      double fx = (double)X / (double)other.X;
+      double fy = (double)Y / (double)other.Y;
+      double fi = ceil( fx + fy ) * 0.5;
+      return (int)fi;
+    }
 	};
 
 
@@ -66,7 +79,9 @@ namespace GOTHIC_ENGINE {
 	typedef long( __stdcall* BinkCopyToBufferFunc )(void* bink, void* dest, long destpitch, ulong destheight, ulong destx, ulong desty, ulong flags);
 	typedef void( __stdcall* BinkBufferBlitFunc )(void* buf, void* rects, ulong numrects);
 	typedef void( __stdcall* BinkGotoFunc )(void* bink, ulong frame, long flags);
-	typedef void( __stdcall* BinkSetVolumeFunc )(void* bnk, uint trackid, long volume );
+	typedef void( __stdcall* BinkSetVolumeFunc )(void* bnk, ulong trackid, long volume );
+	typedef long( __stdcall* BinkGetRectsFunc )(void* bnk, long flags );
+	typedef RECT BINKRECT;
 
 	extern BinkDoFrameFunc BinkDoFrame;
 	extern BinkCopyToBufferFunc BinkCopyToBuffer;
