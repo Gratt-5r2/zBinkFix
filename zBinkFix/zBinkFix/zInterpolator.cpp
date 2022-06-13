@@ -7,18 +7,18 @@ namespace GOTHIC_ENGINE {
   static int InterpolationPixelSizeMin     = BinkGetInterpolationPixelSizeMin();
   static int InterpolationPixelSizeCurrent = InterpolationPixelSize;
 
-  enum zResizeMethod {
-    zResize_Copy,
-    zResize_Linear,
-    zResize_Interp
+  enum zScalingMethod {
+    zScaling_Copy,
+    zScaling_Linear,
+    zScaling_Interp
   };
 
   static zBinkInterpolationTable BinkInterpolationTable;
-  static Semaphore InterpolationThreadsLimit( BinkGetInterpolationThreadsCount() );
+  static Semaphore ImageScalingTasksLimit( BinkGetInterpolationThreadsCount() );
 
 
-  struct zImageScaler {
-    zResizeMethod Method;
+  struct zImageScalingTask {
+    zScalingMethod Method;
     zBinkImage* DstImage;
     const zBinkImage* SrcImage;
     int PixelSize;
@@ -29,12 +29,12 @@ namespace GOTHIC_ENGINE {
     int EndX;
     int EndY;
 
-    zImageScaler() {
+    zImageScalingTask() {
       DstImage = Null;
       SrcImage = Null;
       PixelSize = 0;
       InterpolationEvent.TurnOff();
-      InterpolationThread.Init( &zImageScaler::ResizeImagePartAsync );
+      InterpolationThread.Init( &zImageScalingTask::ResizeImagePartAsync );
       InterpolationThread.Detach( this );
     }
 
@@ -42,7 +42,7 @@ namespace GOTHIC_ENGINE {
     /*
      * Smothness resize algorithm
      */
-    static void ResizeImagePart_Interp( zImageScaler* info ) {
+    static void ScaleImagePart_Interp( zImageScalingTask* info ) {
             zBinkImage& dstImage = *info->DstImage;
       const zBinkImage& srcImage = *info->SrcImage;
       const int pixelSize        = info->PixelSize;
@@ -60,9 +60,9 @@ namespace GOTHIC_ENGINE {
           }
         }
       }
-      // Do this came, but skip several pixels if the interpolation
+      // Do this same, but skip several pixels if the interpolation
       // quality is not the best. In skipped segments will
-      // be setted information from the previous pixels.
+      // be set information from the previous pixels.
       else {
         for( int dy = startY; dy < endY; dy += pixelSize ) {
           for( int dx = 0; dx < endX; dx += pixelSize ) {
@@ -71,6 +71,8 @@ namespace GOTHIC_ENGINE {
             int endQY = min2( dy + pixelSize, endY );
             int endQX = min2( dx + pixelSize, endX );
 
+            // This is a quad region the size of the interpolation
+            // pixel size. Used to accelerate calculations 
             for( int qy = dy; qy < endQY; qy++ ) {
               int lineY = BinkInterpolationTable.GetLineStart( qy );
               for( int qx = dx; qx < endQX; qx++ )
@@ -85,7 +87,7 @@ namespace GOTHIC_ENGINE {
     /*
      * Linear resize algorithm
      */
-    static void ResizeImagePart_Copy( zImageScaler* info ) {
+    static void ScaleImagePart_Copy( zImageScalingTask* info ) {
             zBinkImage& dstImage = *info->DstImage;
       const zBinkImage& srcImage = *info->SrcImage;
       const int startY           = info->StartY;
@@ -106,7 +108,7 @@ namespace GOTHIC_ENGINE {
     /*
      * Linear copying algorithm
      */
-    static void ResizeImagePart_Linear( zImageScaler* info ) {
+    static void ScaleImagePart_Linear( zImageScalingTask* info ) {
             zBinkImage& dstImage = *info->DstImage;
       const zBinkImage& srcImage = *info->SrcImage;
       const int startY           = info->StartY;
@@ -128,127 +130,89 @@ namespace GOTHIC_ENGINE {
     }
 
 
-    static void ResizeImagePartAsync( zImageScaler* scaler ) {
+    static void ResizeImagePartAsync( zImageScalingTask* scaler ) {
       while( true ) {
         // Wait command to start
         scaler->InterpolationEvent.WaitOn();
-        InterpolationThreadsLimit.Enter();
+        ImageScalingTasksLimit.Enter();
 
-             if( scaler->Method == zResize_Interp ) ResizeImagePart_Interp( scaler );
-        else if( scaler->Method == zResize_Copy   ) ResizeImagePart_Copy  ( scaler );
-        else if( scaler->Method == zResize_Linear ) ResizeImagePart_Linear( scaler );
+             if( scaler->Method == zScalingMethod::zScaling_Interp ) ScaleImagePart_Interp( scaler );
+        else if( scaler->Method == zScalingMethod::zScaling_Copy   ) ScaleImagePart_Copy  ( scaler );
+        else if( scaler->Method == zScalingMethod::zScaling_Linear ) ScaleImagePart_Linear( scaler );
         
         // Send command to stop
-        InterpolationThreadsLimit.Leave();
+        ImageScalingTasksLimit.Leave();
         scaler->InterpolationEvent.TurnOff();
       }
     }
   };
 
 
-  typedef int(*gpuScaleImageFunc)( int* dstImage, int dstX, int dstY, int dstPitch32, int* srcImage, int srcX, int srcY, int srcPitch32, bool interpolation );
-  gpuScaleImageFunc ImportGpuScaleImage() {
-    HMODULE module = LoadLibraryAST( "oGraphics.dll" );
-    void* proc = GetProcAddress( module, "?gpuScaleImage@@YAHPAHHHH0HHH_N@Z" );
-    return (gpuScaleImageFunc)proc;
-  }
+  static zImageScalingTask* ImageScalingTasks = CHECK_THIS_ENGINE ? new zImageScalingTask[INTERPOLATION_INFO_DIM] : Null;
 
-  /*
-    static gpuScaleImageFunc gpuScaleImage = ImportGpuScaleImage();
-    if( gpuScaleImage ) {
-      gpuScaleImage( dst.ImageBinary, dst.Size.X, dst.Size.Y, dst.Size.Pitch4, src.ImageBinary, src.Size.X, src.Size.Y, src.Size.Pitch4, true );
+#pragma warning(push)
+#pragma warning(disable:4244)
+  void ResizeImageRegion( zBinkImage& dst, const zBinkImage& src, const BINKRECT& srcRect, const int& pixelSize ) {
+    if( srcRect.left >= srcRect.right || srcRect.top >= srcRect.bottom )
       return;
-    }
-  */
 
-
-  static zImageScaler* interpolation = new zImageScaler[INTERPOLATION_INFO_DIM];
-  static int interpolationEnum = 0;
-
-  void ResizeImage( zBinkImage& dst, const zBinkImage& src, const int& pixelSize ) {
     int pixelSizeLow = InterpolationPixelSizeLow;
-    zResizeMethod method;
+    zScalingMethod method;
 
-         if( dst.Size == src.Size )     method = zResizeMethod::zResize_Copy;
-    else if( pixelSize > pixelSizeLow ) method = zResizeMethod::zResize_Linear;
-    else if( dst.Size < src.Size )      method = zResizeMethod::zResize_Linear;
-    else if( pixelSize <= 0 )           method = zResizeMethod::zResize_Linear;
-    else                                method = zResizeMethod::zResize_Interp;
+         if( dst.Size == src.Size )     method = zScalingMethod::zScaling_Copy;   // Interpolation not needed
+    else if( dst.Size <  src.Size )     method = zScalingMethod::zScaling_Linear; // Downscale image
+    else if( pixelSize > pixelSizeLow ) method = zScalingMethod::zScaling_Linear; // Minimal upscale quality
+    else if( pixelSize <= 0 )           method = zScalingMethod::zScaling_Linear; // Interpolation disabled
+    else                                method = zScalingMethod::zScaling_Interp; // Interpolatoin enabled
 
-    int yStep = ceil((double)dst.Size.Y / INTERPOLATION_INFO_DIM);
-    int yStart = 0;
-
-    // Create context of the editable image region. In this algirithm
-    // used 16 threads. Count of the active threads defined 
-    //by Plugin automatically or custom in the SystemPack.ini
-    for( int i = 0; i < INTERPOLATION_INFO_DIM; i++ ) {
-      interpolation[i].Method    = method;
-      interpolation[i].DstImage  = &dst;
-      interpolation[i].SrcImage  = &src;
-      interpolation[i].PixelSize = pixelSize;
-      interpolation[i].StartY    = yStart;
-      interpolation[i].EndY      = min2( yStart + yStep, dst.Size.Y );
-      interpolation[i].InterpolationEvent.TurnOn();
-      yStart += yStep;
-
-      // Correct last thread by image bottom edge
-      if( i == INTERPOLATION_INFO_DIM - 1 )
-        interpolation[i].EndY = dst.Size.Y;
-    }
-
-    // Wait until all threads finish working
-    for( int i = 0; i < INTERPOLATION_INFO_DIM; i++ )
-      interpolation[i].InterpolationEvent.WaitOff();
-  }
-
-
-  void ResizeImage( zBinkImage& dst, const zBinkImage& src, const RECT& srcRect, const int& pixelSize ) {
-    int pixelSizeLow = InterpolationPixelSizeLow;
-    zResizeMethod method;
-
-         if( dst.Size == src.Size )     method = zResizeMethod::zResize_Copy;
-    else if( pixelSize > pixelSizeLow ) method = zResizeMethod::zResize_Linear;
-    else if( dst.Size < src.Size )      method = zResizeMethod::zResize_Linear;
-    else if( pixelSize <= 0 )           method = zResizeMethod::zResize_Linear;
-    else                                method = zResizeMethod::zResize_Interp;
-
-    ulong dstRegX      = MakeCorrectSingleIndex( dst.Size.X, src.Size.X, srcRect.left );
-    ulong dstRegY      = MakeCorrectSingleIndex( dst.Size.X, src.Size.X, srcRect.top );
-    ulong dstRegWidth  = MakeCorrectSingleIndex( dst.Size.Y, src.Size.Y, srcRect.right );
-    ulong dstRegHeight = MakeCorrectSingleIndex( dst.Size.Y, src.Size.Y, srcRect.bottom );
-
-    int yStep = ceil((double)(dstRegY + dstRegHeight) / INTERPOLATION_INFO_DIM);
-    if( yStep == 0 )
-      yStep = 1;
+    ulong dstRegX      = MakeScaledIndex( dst.Size.X, src.Size.X, srcRect.left );
+    ulong dstRegY      = MakeScaledIndex( dst.Size.X, src.Size.X, srcRect.top );
+    ulong dstRegWidth  = MakeScaledIndex( dst.Size.Y, src.Size.Y, srcRect.right );
+    ulong dstRegHeight = MakeScaledIndex( dst.Size.Y, src.Size.Y, srcRect.bottom );
 
     int yStart = dstRegY;
-    int yEnd = dstRegY + dstRegHeight;
+    int yEnd   = dstRegY + dstRegHeight;
+    int yStep  = max2( dstRegHeight / INTERPOLATION_INFO_DIM, 1 );
 
     // Create context of the editable image region. In this algirithm
     // used 16 threads. Count of the active threads defined 
-    //by Plugin automatically or custom in the SystemPack.ini
+    // by Plugin automatically or custom in the SystemPack.ini
     for( int i = 0; i < INTERPOLATION_INFO_DIM; i++ ) {
-      interpolation[i].Method    = method;
-      interpolation[i].DstImage  = &dst;
-      interpolation[i].SrcImage  = &src;
-      interpolation[i].PixelSize = pixelSize;
-      interpolation[i].StartX    = dstRegX;
-      interpolation[i].StartY    = yStart;
-      interpolation[i].EndX      = dstRegX + dstRegWidth;
-      interpolation[i].EndY      = min2( yStart + yStep, yEnd );
-      interpolation[i].InterpolationEvent.TurnOn();
+      auto& task = ImageScalingTasks[i];
+
+      task.Method    = method;
+      task.DstImage  = &dst;
+      task.SrcImage  = &src;
+      task.PixelSize = pixelSize;
+      task.StartX    = dstRegX;
+      task.StartY    = yStart;
+      task.EndX      = dstRegX + dstRegWidth;
+      task.EndY      = yStart + yStep;
+      task.InterpolationEvent.TurnOn();
       yStart += yStep;
 
       // Correct last thread by image bottom edge
       if( i == INTERPOLATION_INFO_DIM - 1 )
-        interpolation[i].EndY = yEnd;
+        task.EndY = yEnd;
 
+      // Enough for work
       if( yStart >= yEnd )
         break;
     }
 
     // Wait until all threads finish working
     for( int i = 0; i < INTERPOLATION_INFO_DIM; i++ )
-      interpolation[i].InterpolationEvent.WaitOff();
+      ImageScalingTasks[i].InterpolationEvent.WaitOff();
   }
+
+  
+  void ResizeImage( zBinkImage& dst, const zBinkImage& src, const int& pixelSize ) {
+    RECT region;
+    region.left   = 0;
+    region.top    = 0;
+    region.right  = src.Size.X;
+    region.bottom = src.Size.Y;
+    ResizeImageRegion( dst, src, region, pixelSize );
+  }
+#pragma warning(pop)
 }

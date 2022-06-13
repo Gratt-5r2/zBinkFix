@@ -46,6 +46,12 @@ namespace GOTHIC_ENGINE {
       double fi = ceil( fx + fy ) * 0.5;
       return (int)fi;
     }
+
+		void Reset() {
+			X = 0;
+			Y = 0;
+			Pitch4 = 0;
+		}
 	};
 
 

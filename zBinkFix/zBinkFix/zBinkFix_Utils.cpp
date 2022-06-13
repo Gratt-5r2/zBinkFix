@@ -33,11 +33,21 @@ namespace GOTHIC_ENGINE {
   }
 
 
-  inline SIZE ToSize( const int& x, const int& y ) {
+  inline SIZE MakeSize( const int& x, const int& y ) {
     SIZE sz;
     sz.cx = x;
     sz.cy = y;
     return sz;
+  }
+
+
+  inline RECT MakeRect( const int& width, const int& height ) {
+    RECT rect;
+    rect.left = 0;
+    rect.top = 0;
+    rect.right = width;
+    rect.bottom = height;
+    return rect;
   }
 
 

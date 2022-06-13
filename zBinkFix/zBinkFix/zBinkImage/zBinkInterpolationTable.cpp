@@ -17,7 +17,7 @@ namespace GOTHIC_ENGINE {
   }
 
 
-  inline float MakeCorrectSingleIndex( const int& dstWidth, const int& srcWidth, const int& srcPos ) {
+  inline float MakeScaledIndex( const int& dstWidth, const int& srcWidth, const int& srcPos ) {
     return (float)dstWidth * (float)srcPos / (float)srcWidth;
   }
 
@@ -46,11 +46,7 @@ namespace GOTHIC_ENGINE {
       return;
     }
 
-    if( Table != Null ) {
-      delete[] Table;
-      delete[] LinesImageIndexes;
-      delete[] LinesTableIndexes;
-    }
+    Clear();
 
     // Create a special table of the information
     // about the image transformation
@@ -68,9 +64,9 @@ namespace GOTHIC_ENGINE {
 
       // Projection X and Y coordinates
       // of the surface to the source image
-      float ySmallPos = MakeCorrectSingleIndex( smallSize.Y, bigSize.Y, dy );
+      float ySmallPos = MakeScaledIndex( smallSize.Y, bigSize.Y, dy );
       for( int dx = 0; dx < bigSize.X; dx++ ) {
-        float xSmallPos = MakeCorrectSingleIndex( smallSize.X, bigSize.X, dx );
+        float xSmallPos = MakeScaledIndex( smallSize.X, bigSize.X, dx );
 
         // Define 4 nearests pixels by XY
         zInterpolationPoint& point = Table[xy2i( dx, dy, bigSize.X )];
@@ -152,6 +148,8 @@ namespace GOTHIC_ENGINE {
 
 
   void zBinkInterpolationTable::Clear() {
+    BigSize.Reset();
+    SmallSize.Reset();
     if( Table ) {
       delete[] Table;
       Table = Null;
@@ -168,7 +166,6 @@ namespace GOTHIC_ENGINE {
 
 
   zBinkInterpolationTable::~zBinkInterpolationTable() {
-    if( Table != Null )
-      delete[] Table;
+    Clear();
   }
 }

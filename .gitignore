@@ -368,3 +368,6 @@ FodyWeavers.xsd
 /zBinkFix/G2A MT Release
 /zBinkFix/MP x2 MD Release
 *.7z
+/zBinkFix/G1 MD Release
+/zBinkFix/G2 MT Release
+/zBinkFix/MP x4 MT Release

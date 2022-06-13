@@ -21,6 +21,8 @@ namespace GOTHIC_ENGINE {
   }
 
 
+  // This function accumulates any frame times and returns
+  // best average time to define/change the smoothness quality
   uint AccumulateTime( const uint& time, const uint& default = 0 ) {
     static uint totalTime = 0;
     static const uint timelineLength = 60;
@@ -51,16 +53,6 @@ namespace GOTHIC_ENGINE {
     }
 
     return totalTime / timelineLength;
-  }
-
-
-  RECT MakeRect( const int& width, const int& height ) {
-    RECT rect;
-    rect.left = 0;
-    rect.top = 0;
-    rect.right = width;
-    rect.bottom = height;
-    return rect;
   }
 
 
@@ -141,7 +133,8 @@ namespace GOTHIC_ENGINE {
     if( !rnd )
       return False;
 
-    rnd->xd3d_Buffer->Unlock( &rect );
+    // rnd->xd3d_Buffer->Unlock( &rect );
+    rnd->xd3d_Buffer->Unlock( 0 );
     return True;
   }
 
@@ -169,7 +162,7 @@ namespace GOTHIC_ENGINE {
 
 
   int zCBinkPlayer::BlitFrame( const bool& idle ) {
-    RECT changedRegion;
+    BINKRECT changedRegion;
     if( !idle ) {
       // Don't draw this frame if the
       // time of the skip has not passed
@@ -211,7 +204,7 @@ namespace GOTHIC_ENGINE {
     // about resolution and size factor of the video
     if( idle ) {
       InterpolationPixelSizeLow = surfaceSize.GetScaleFactor( videoSize );
-      BinkFixReport( string::Combine( "video quality levels: %i", InterpolationPixelSizeLow ) );
+      BinkFixReport( string::Combine( "video quality levels: %i / %i", InterpolationPixelSizeCurrent, InterpolationPixelSizeLow ) );
       BinkInterpolationTable.Update( surfaceSize, videoSize );
       UpdateBinkBufferSize( BinkImageBuffer, videoSize.X, videoSize.Y );
       CloseSurface( surfaceRect );
@@ -220,13 +213,13 @@ namespace GOTHIC_ENGINE {
 
     BinkInterpolationTable.Update( surfaceSize, videoSize );
 
-    // Copying video data to the buffer
+    // Copying the video data to the buffer
     BinkCopyToBuffer( mVideoHandle, BinkImageBuffer, videoSize.Pitch4 * sizeof( int ), videoSize.Y, 0, 0, BINKCPY_FLAGS );
 
     // Trying to resize the image
     zBinkImage dstImage( (int*)ddsd.lpSurface, surfaceSize );
     zBinkImage srcImage( BinkImageBuffer, videoSize );
-    ResizeImage( dstImage, srcImage, changedRegion, InterpolationPixelSizeCurrent );
+    ResizeImageRegion( dstImage, srcImage, changedRegion, InterpolationPixelSizeCurrent );
 
     // Apply surface changes
     CloseSurface( surfaceRect );
@@ -251,7 +244,7 @@ namespace GOTHIC_ENGINE {
   int zCBinkPlayer::OpenVideo_Union( zSTRING name ) {
     int ok = THISCALL( Hook_zCBinkPlayer_OpenVideo )( name );
     if( ok ) {
-      // Clear screen and play the idle frame
+      // Clear the screen and play the idle frame
       // to collect information about the surface
       ClearScreen();
       BlitFrame( true );
@@ -266,7 +259,8 @@ namespace GOTHIC_ENGINE {
       else if( IsResMoreThan4K() ) InterpolationPixelSizeCurrent = InterpolationPixelSize + 1;
       else                         InterpolationPixelSizeCurrent = InterpolationPixelSize;
 
-      // Reset the time accumulator
+      // Reset the time accumulator by
+      // the expected middle frame time
       AccumulateTime( Invalid, 500 / GetBinkFrameRate() );
     }
 
@@ -278,9 +272,16 @@ namespace GOTHIC_ENGINE {
   HOOK Hook_zCBinkPlayer_CloseVideo PATCH_IF( &zCBinkPlayer::CloseVideo, &zCBinkPlayer::CloseVideo_Union, IsFixBinkEnabled );
 
   int zCBinkPlayer::CloseVideo_Union() {
-    THISCALL( Hook_zCBinkPlayer_CloseVideo )();
-    shi_free( BinkImageBuffer );
-    BinkInterpolationTable.Clear();
+    int ok = THISCALL( Hook_zCBinkPlayer_CloseVideo )();
+    if( ok ) {
+      if( BinkImageBuffer ) {
+        shi_free( BinkImageBuffer );
+        BinkImageBuffer = Null;
+      }
+      BinkInterpolationTable.Clear();
+    }
+
+    return ok;
   }
 
 
@@ -293,6 +294,7 @@ namespace GOTHIC_ENGINE {
     if( IsResMoreThan4K() )
       return PlayFrameBigScreen();
 
+    static Timer timer;
     static Chronograph chrono;
     chrono.StartCounter();
     if( !BeginFrame() )
@@ -300,19 +302,13 @@ namespace GOTHIC_ENGINE {
 
     // Try to draw bink buffer
     // to the DirectX7 surface
-    bool frameBlited = BlitFrame();
-
+    bool frameBlited  = BlitFrame();
     int& pixelSize    = InterpolationPixelSizeCurrent;
     int& pixelSizeLow = InterpolationPixelSizeLow;
-    int64 timePassed  = chrono.GetCounter();
+    uint timePassed   = (uint)chrono.GetCounter();
     uint averageTime  = AccumulateTime( timePassed );
     uint videoFps     = GetBinkFrameRate();
     uint videoSpd     = 1000 / videoFps;
-
-    static Timer timer;
-    // if( timer[0u].Await( 1000, true ) ) {
-    //   cmd << averageTime << "    " << videoSpd << endl;
-    // }
 
     // Skip frames if the video is late
     if( averageTime + 2 >= videoSpd ) {
@@ -333,14 +329,14 @@ namespace GOTHIC_ENGINE {
       if( averageTime > videoSpd * 0.85 ) {
         if( pixelSize <= pixelSizeLow ) {
           pixelSize++;
-          BinkFixReport( "quality reduce    " + A  pixelSize + string::Combine( "    %i / %i", averageTime, videoSpd ) );
+          BinkFixReport( string::Combine( "quality (-)    lvl: %i / %i    fps: %i / %i", pixelSize, pixelSizeLow, averageTime, videoSpd ) );
           AccumulateTime( 0 );
         }
       }
       else if( pixelSize > InterpolationPixelSizeMin ) {
         if( averageTime < videoSpd * 0.45 ) {
           pixelSize--;
-          BinkFixReport( "quality increase  " + A pixelSize + string::Combine( "    %i / %i", averageTime, videoSpd ) );
+          BinkFixReport( string::Combine( "quality (+)    lvl: %i / %i    fps: %i / %i", pixelSize, pixelSizeLow, averageTime, videoSpd ) );
           AccumulateTime( videoSpd );
         }
       }
@@ -352,6 +348,7 @@ namespace GOTHIC_ENGINE {
 
 
   int zCBinkPlayer::PlayFrameBigScreen() {
+    static Timer timer;
     static Chronograph chrono;
     chrono.StartCounter();
     if( !BeginFrame() )
@@ -376,7 +373,7 @@ namespace GOTHIC_ENGINE {
     }
 
     // Skip frames if the video is late
-    int64 timePassed = chrono.GetCounter();
+    uint timePassed = (uint)chrono.GetCounter();
     uint averageTime = AccumulateTime( timePassed );
     if( timePassed > videoSpd ) {
       uint dim = timePassed - videoSpd;
@@ -385,19 +382,18 @@ namespace GOTHIC_ENGINE {
 
     // Check the average frame time
     // and choose the smoothness quality
-    static Timer timer;
     if( timer[1].Await( 500 ) ) {
       if( averageTime > videoSpd * 1.5 ) {
         if( pixelSize <= pixelSizeLow ) {
           pixelSize++;
-          BinkFixReport( "quality reduce    " + A  pixelSize + string::Combine( "    %i / %i", averageTime, videoSpd ) );
+          BinkFixReport( string::Combine( "quality (-)    lvl: %i / %i    fps: %i / %i", pixelSize, pixelSizeLow, averageTime, videoSpd ) );
           AccumulateTime( 0 );
         }
       }
       else if( pixelSize > InterpolationPixelSizeMin ) {
         if( averageTime < videoSpd * 0.45 ) {
           pixelSize--;
-          BinkFixReport( "quality increase  " + A pixelSize + string::Combine( "    %i / %i", averageTime, videoSpd ) );
+          BinkFixReport( string::Combine( "quality (+)    lvl: %i / %i    fps: %i / %i", pixelSize, pixelSizeLow, averageTime, videoSpd ) );
           AccumulateTime( videoSpd );
         }
       }
@@ -437,8 +433,13 @@ namespace GOTHIC_ENGINE {
     if( !extendedKeys ) {
       switch( key ) {
         case KEY_SPACE:
+          if( zKeyPressed( KEY_LSHIFT ) ) {
+            mPaused ? Unpause() : Pause();
+            return True;
+          }
         case KEY_ESCAPE:
-          Stop();
+        case KEY_RETURN:
+            Stop();
           return True;
       }
 
@@ -446,14 +447,12 @@ namespace GOTHIC_ENGINE {
     }
 
     switch( key ) {
-      case KEY_HOME:
-      {
+      case KEY_HOME: {
         BinkGoto( mVideoHandle, 1, 0 );
         return True;
       }
 
-      case KEY_RIGHT:
-      {
+      case KEY_RIGHT: {
         ulong nextFrame = GetBinkFrame() + 30;
         ulong framesNum = GetBinkFramesCount();
         if( nextFrame >= framesNum )
@@ -463,27 +462,23 @@ namespace GOTHIC_ENGINE {
         return True;
       }
 
-      case KEY_LEFT:
-      {
+      case KEY_LEFT: {
         ulong nextFrame = GetBinkFrame() - min( GetBinkFrame(), 30 );
         BinkGoto( mVideoHandle, nextFrame, 1 );
         return True;
       }
 
-      case KEY_SPACE:
-      {
+      case KEY_SPACE: {
         mPaused ? Unpause() : Pause();
         return True;
       }
 
-      case KEY_ESCAPE:
-      {
+      case KEY_ESCAPE: {
         Stop();
         return True;
       }
 
-      case KEY_DOWN:
-      {
+      case KEY_DOWN: {
         mSoundVolume -= 0.1f;
         if( mSoundVolume < 0.0f )
           mSoundVolume = 0.0f;
@@ -492,8 +487,7 @@ namespace GOTHIC_ENGINE {
         return True;
       }
 
-      case KEY_UP:
-      {
+      case KEY_UP: {
         mSoundVolume += 0.1f;
         if( mSoundVolume > 1.0f )
           mSoundVolume = 1.0f;
@@ -502,8 +496,7 @@ namespace GOTHIC_ENGINE {
         return True;
       }
 
-      case KEY_Q:
-      {
+      case KEY_Q: {
         if( mSoundOn ) {
           BinkSetVolume( mVideoHandle, 0, 0 );
           mSoundOn = False;
@@ -515,6 +508,8 @@ namespace GOTHIC_ENGINE {
         return True;
       }
     }
+
+    return False;
   }
 #pragma warning(pop)
 }
