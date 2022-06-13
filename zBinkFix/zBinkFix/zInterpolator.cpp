@@ -34,42 +34,41 @@ namespace GOTHIC_ENGINE {
       SrcImage = Null;
       PixelSize = 0;
       InterpolationEvent.TurnOff();
-      InterpolationThread.Init( &zImageScalingTask::ResizeImagePartAsync );
+      InterpolationThread.Init( &zImageScalingTask::ScaleImagePartAsync );
       InterpolationThread.Detach( this );
     }
 
 
     /*
-     * Smothness resize algorithm
+     * Smothnened scaling algorithm
      */
     static void ScaleImagePart_Interp( zImageScalingTask* info ) {
             zBinkImage& dstImage = *info->DstImage;
       const zBinkImage& srcImage = *info->SrcImage;
       const int pixelSize        = info->PixelSize;
-      const int startY           = info->StartY;
-      const int endY             = info->EndY;
-      const int endX             = dstImage.Size.X;
+      const int yStart           = info->StartY;
+      const int yEnd             = info->EndY;
+      const int xEnd             = dstImage.Size.X;
 
       // Calculate and place interpolated
       // color data to the dest image by XY
       if( pixelSize == 1 ) {
-        for( int dy = startY; dy < endY; dy++ ) {
-          for( int dx = 0; dx < endX; dx++ ) {
+        for( int dy = yStart; dy < yEnd; dy++ ) {
+          for( int dx = 0; dx < xEnd; dx++ ) {
             int value = BinkInterpolationTable.GetInterpolatedColor( srcImage, dx, dy );
             dstImage( BinkInterpolationTable.GetLinearIndex( dx, dy ) ) = value;
           }
         }
       }
-      // Do this same, but skip several pixels if the interpolation
-      // quality is not the best. In skipped segments will
-      // be set information from the previous pixels.
+      // Do this same, but skip several pixels if
+      // the interpolation quality is not the best.
       else {
-        for( int dy = startY; dy < endY; dy += pixelSize ) {
-          for( int dx = 0; dx < endX; dx += pixelSize ) {
+        for( int dy = yStart; dy < yEnd; dy += pixelSize ) {
+          for( int dx = 0; dx < xEnd; dx += pixelSize ) {
 
             int value = BinkInterpolationTable.GetInterpolatedColor( srcImage, dx, dy );
-            int endQY = min2( dy + pixelSize, endY );
-            int endQX = min2( dx + pixelSize, endX );
+            int endQY = min2( dy + pixelSize, yEnd );
+            int endQX = min2( dx + pixelSize, xEnd );
 
             // This is a quad region the size of the interpolation
             // pixel size. Used to accelerate calculations 
@@ -85,44 +84,44 @@ namespace GOTHIC_ENGINE {
 
 
     /*
-     * Linear resize algorithm
+     * Linear copying algorithm
      */
     static void ScaleImagePart_Copy( zImageScalingTask* info ) {
             zBinkImage& dstImage = *info->DstImage;
       const zBinkImage& srcImage = *info->SrcImage;
-      const int startY           = info->StartY;
-      const int endY             = info->EndY;
-      const int endX             = dstImage.Size.X;
+      const int ySstart           = info->StartY;
+      const int yEnd             = info->EndY;
+      const int xEnd             = dstImage.Size.X;
 
       // Calculate source image indexes
       // and place values to the dest image
-      for( int dy = startY; dy < endY; dy++ ) {
+      for( int dy = ySstart; dy < yEnd; dy++ ) {
         int dlny = dy * dstImage.Size.Pitch4;
         int slny = dy * srcImage.Size.Pitch4;
-        for( int dx = 0; dx < endX; dx++ )
+        for( int dx = 0; dx < xEnd; dx++ )
           dstImage( dlny + dx ) = srcImage( slny + dx );
       }
     }
 
 
     /*
-     * Linear copying algorithm
+     * Linear scaling algorithm
      */
     static void ScaleImagePart_Linear( zImageScalingTask* info ) {
             zBinkImage& dstImage = *info->DstImage;
       const zBinkImage& srcImage = *info->SrcImage;
-      const int startY           = info->StartY;
-      const int endY             = info->EndY;
-      const int endX             = dstImage.Size.X;
+      const int yStart           = info->StartY;
+      const int yEnd             = info->EndY;
+      const int xEnd             = dstImage.Size.X;
 
       // Calculate source image indexes
       // and place values to the dest image
-      for( int dy = startY; dy < endY; dy++ ) {
+      for( int dy = yStart; dy < yEnd; dy++ ) {
         int sy   = srcImage.Size.Y * dy / dstImage.Size.Y;
         int dlny = dy * dstImage.Size.Pitch4;
         int slny = sy * srcImage.Size.Pitch4;
     
-        for( int dx = 0; dx < endX; dx++ ) {
+        for( int dx = 0; dx < xEnd; dx++ ) {
           int sx = srcImage.Size.X * dx / dstImage.Size.X;
           dstImage( dlny + dx ) = srcImage( slny + sx );
         }
@@ -130,7 +129,7 @@ namespace GOTHIC_ENGINE {
     }
 
 
-    static void ResizeImagePartAsync( zImageScalingTask* scaler ) {
+    static void ScaleImagePartAsync( zImageScalingTask* scaler ) {
       while( true ) {
         // Wait command to start
         scaler->InterpolationEvent.WaitOn();
