@@ -133,8 +133,7 @@ namespace GOTHIC_ENGINE {
     if( !rnd )
       return False;
 
-    // rnd->xd3d_Buffer->Unlock( &rect );
-    rnd->xd3d_Buffer->Unlock( 0 );
+    rnd->xd3d_Buffer->Unlock( Null );
     return True;
   }
 
@@ -254,10 +253,10 @@ namespace GOTHIC_ENGINE {
 
            // Choose the optimal Quality <-> Speed
            // via screen resolution
-           if( IsResMoreThan6K() ) InterpolationPixelSizeCurrent = InterpolationPixelSizeLow + 1;
-      else if( IsResMoreThan5K() ) InterpolationPixelSizeCurrent = (InterpolationPixelSize + InterpolationPixelSizeLow) / 2;
-      else if( IsResMoreThan4K() ) InterpolationPixelSizeCurrent = InterpolationPixelSize + 1;
-      else                         InterpolationPixelSizeCurrent = InterpolationPixelSize;
+           if( IsResMoreThan6K() ) InterpolationPixelSizeCurrent =  InterpolationPixelSizeLow + 1;
+      else if( IsResMoreThan5K() ) InterpolationPixelSizeCurrent = (InterpolationPixelSize + InterpolationPixelSizeLow) >> 1;
+      else if( IsResMoreThan4K() ) InterpolationPixelSizeCurrent =  InterpolationPixelSize + 1;
+      else                         InterpolationPixelSizeCurrent =  InterpolationPixelSize;
 
       // Reset the time accumulator by
       // the expected middle frame time

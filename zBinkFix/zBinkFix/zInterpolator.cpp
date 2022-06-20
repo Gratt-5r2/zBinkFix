@@ -190,13 +190,11 @@ namespace GOTHIC_ENGINE {
       task.InterpolationEvent.TurnOn();
       yStart += yStep;
 
-      // Correct last thread by image bottom edge
-      if( i == INTERPOLATION_INFO_DIM - 1 )
+      // Correct the last thread by image bottom edge
+      if( yStart >= yEnd || i == INTERPOLATION_INFO_DIM - 1 ) {
         task.EndY = yEnd;
-
-      // Enough for work
-      if( yStart >= yEnd )
         break;
+      }
     }
 
     // Wait until all threads finish working

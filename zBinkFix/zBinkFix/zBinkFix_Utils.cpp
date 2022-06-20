@@ -167,9 +167,9 @@ namespace GOTHIC_ENGINE {
   static int BinkGetInterpolationPixelSize() {
     int cpus = GetCpusCount();
     int pixelSize;
-         if( cpus == 1 ) pixelSize = 0; // Shitbox
-    else if( cpus <  4 ) pixelSize = 2; // Who are you ??
-    else                 pixelSize = 1; // Stanrard PC
+         if( cpus == 1 ) pixelSize = 0;
+    else if( cpus <  4 ) pixelSize = 2;
+    else                 pixelSize = 1;
 
     Union.GetSysPackOption().Read( pixelSize, "DEBUG", "FixBink_InterpPixelSize", pixelSize );
     return pixelSize;
@@ -201,10 +201,10 @@ namespace GOTHIC_ENGINE {
     if( Union.Dx11IsEnabled() )
       return false;
 
-    if( ReadOption( "DEBUG", "FixBink", true ) != 1 )
+    if( ReadOption( "DEBUG", "FixBinkNew", true ) == False )
       return false;
 
-    if( ReadOption( "DEBUG", "FixBinkOld", false ) == 1 ) {
+    if( ReadOption( "DEBUG", "FixBink", false ) != False ) {
       LoadLibraryAST( "zFixBinkOld.dll" );
       return false;
     }
@@ -223,9 +223,9 @@ namespace GOTHIC_ENGINE {
   static
     RECT BinkRectToRect( const BINKRECT& binkRect ) {
     RECT rect;
-    rect.left = binkRect.left;
-    rect.top = binkRect.top;
-    rect.right = binkRect.left + binkRect.right;
+    rect.left   = binkRect.left;
+    rect.top    = binkRect.top;
+    rect.right  = binkRect.left + binkRect.right;
     rect.bottom = binkRect.top + binkRect.bottom;
     return rect;
   }
@@ -233,9 +233,9 @@ namespace GOTHIC_ENGINE {
 
   static BINKRECT RectToBinkRect( const RECT& rect ) {
     BINKRECT binkRect;
-    binkRect.left = rect.left;
-    binkRect.top = rect.top;
-    binkRect.right = rect.right - rect.left;
+    binkRect.left   = rect.left;
+    binkRect.top    = rect.top;
+    binkRect.right  = rect.right - rect.left;
     binkRect.bottom = rect.bottom - rect.top;
     return binkRect;
   }
